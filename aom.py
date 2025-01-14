@@ -491,8 +491,6 @@ def compute_fake_xyz(yaw, pitch, roll, x, y, z, autoX, autoY, autoZ, deltaX, del
 	diagnostics.watch(context.y_offset)
 	diagnostics.watch(y)
 	diagnostics.watch(fake_y)
-
-	
  
 	return fake_yaw, fake_pitch, fake_roll, fake_x, fake_y, fake_z
 
@@ -507,9 +505,6 @@ def updateTrackir():
 	context.flagYaxis = abs(yaw) >= 45
 	context.flagDeltaY = True #not (context.autoCornerEnd < abs(yaw) and context.flagYaxis)
 	
-	# ===================================================================  
-	# ================ END SWITCH PRESET LOGIC ==========================
-	# ===================================================================
 	autoX, autoY, autoZ = compute_autoXYZ(yaw)
 	deltaX = compute_deltaX(yaw)
 
