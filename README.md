@@ -83,6 +83,7 @@ You can switch presets in-game using:
 - **Lagg:** Press `Up Arrow + Num1`
 - **Yakodin:** Press `Up Arrow + Num3`
 - **F4:** Press `Up Arrow + Num2`
+- **Yakodinb:** Press `Up Arrow + Num4`
 
 **Customizing Presets:**  
 Each preset is defined in the `presets` dictionary in `aom.py`. You can adjust parameters like yaw, pitch, zoom, and offsets to create your custom configurations.

@@ -14,10 +14,10 @@ This script enhances your flight simulation experience by providing customizable
 
 3. **ScrollLock Modes**:
    - Activate **ScrollLock Modes** to dynamically adjust:
-       - Auto shifts
-       - Centering
-       - Zoom in/out
-       - Manual or custom views
+	   - Auto shifts
+	   - Centering
+	   - Zoom in/out
+	   - Manual or custom views
    - Cycle modes using `Right Control + Insert`.
 
 4. **Flap Control**:
@@ -128,7 +128,7 @@ class SystemContext:
 				"isAuto": "setup auto shifts",
 				"isZoomIn": "setup zoomout",
 				"isZoomOut": "setup zoomin",
-    			"isCenter": "setup center",
+				"isCenter": "setup center",
 				"isManualShiftX": "setup manual shift x",
 				"isManualShiftY1": "setup manual y one",
 				"isManualShiftY2": "setup manual y two",
@@ -165,6 +165,9 @@ class SystemContext:
 		self.btn_shift_y_1 = False
 		self.btn_shift_y_2 = False
 		self.btn_center_y = True
+
+		self.previous_flagYaxis = False  # Track the previous state of flagYaxis
+		self.y_offset = 0  # Offset to normalize y value
 
 class FlapsControl:
 	def __init__(self, open_keys, close_keys, duration_open=3, duration_close=4):
@@ -296,6 +299,7 @@ def initInputs():
 	- ArrowUp + Num1: lagg
 	- ArrowUp + Num2: f4
 	- ArrowUp + Num3: yak 1
+ 	- ArrowUp + Num4: yak 1 b
 	"""
 	# === END USER CONFIGURABLE INPUTS ===	
 	keyboard.setPressed(GLOBAL_CENTER_KEY)
@@ -323,10 +327,10 @@ def initPresets():
 			"deltaX1": 0.0007741,
 			"deltaY1": 0.0004167,
 			"deltaZ1": 0.0005185,
-			"deltaX0": 0.049,
+			"deltaX0": 0.029,
 			"deltaY0": -0.13,
-			"deltaZ2_1": -8.98,
-			"deltaZ2_2": 1.93,
+			"deltaZ2_1": -13.32,
+			"deltaZ2_2": -2.45,
 			"deltaX2_1": 1.505,
 			"deltaY2_1": 1.145,
 			"deltaY2_2": 2.489,
@@ -352,6 +356,23 @@ def initPresets():
 			"deltaZ2_4": 6.1,
 			"syaw": -1.5,
 			"spitch": -1.9
+		},
+  		"yakodinb": {
+			"deltaX1": 0.000761,
+			"deltaY1": 0.00035,
+			"deltaZ1": 0.000476,
+			"deltaX0": 0.0,
+			"deltaY0": -0.21,
+			"deltaZ2_1": -6.329,
+			"deltaZ2_2": 4.31,
+			"deltaX2_1": 2.02,
+			"deltaY2_1": 0.74,
+			"deltaY2_2": 1.88,
+			"deltaX2_4": -0.2,
+			"deltaY2_4": -6.89,
+			"deltaZ2_4": 4.17,
+			"syaw": -0.9,
+			"spitch": -1.7
 		},
 	}
 
@@ -388,12 +409,16 @@ def handlePresetChange():
 		context.preset = load_preset("lagg")
 	
 	if keyboard.getKeyDown(Key.UpArrow) and keyboard.getPressed(Key.NumberPad3):
-		speech.say("Loading yakodin preset")
+		speech.say("Loading yak one preset")
 		context.preset = load_preset("yakodin")
 	
 	if keyboard.getKeyDown(Key.UpArrow) and keyboard.getPressed(Key.NumberPad2):
 		speech.say("Loading f4 preset")
 		context.preset = load_preset("f4")
+  
+	if keyboard.getKeyDown(Key.UpArrow) and keyboard.getPressed(Key.NumberPad4):
+		speech.say("Loading yak one b preset")
+		context.preset = load_preset("yakodinb")
 
 def load_preset(preset_name):
 	context.preset = context.presets.get(preset_name, {})
@@ -424,12 +449,12 @@ def compute_autoXYZ(yaw):
 	if yaw != 0:
 		if abs(yaw) <= context.autoCornerStart:
 			return autoX, autoY, autoZ
-		
+
 		if context.autoCornerStart <= abs(yaw) <= context.autoCornerEnd:
 			autoX = (yaw * context.preset["deltaX1"]) ** 5
 			autoY = (yaw * context.preset["deltaY1"]) ** 4
 		else:
-			direction = yaw / abs(yaw)  # Normalize yaw direction
+			direction = yaw / abs(yaw)
 			autoX = (direction * context.autoCornerEnd * context.preset["deltaX1"]) ** 5
 			autoY = (direction * context.autoCornerEnd * context.preset["deltaY1"]) ** 4
 
@@ -444,13 +469,31 @@ def compute_fake_xyz(yaw, pitch, roll, x, y, z, autoX, autoY, autoZ, deltaX, del
 	fake_yaw = yaw * 0.1
 	fake_pitch = pitch
 	fake_roll = roll
-
+ 
 	fake_temp_x = x * (abs(autoX) == 0) + (autoX * 356000.0)
 	fake_temp_x_divider = max(1, abs(fake_temp_x))
 	fake_x = (fake_temp_x - fake_temp_x / fake_temp_x_divider) * (abs(fake_temp_x) >= 1 or abs(autoX) > 0) + deltaX * context.isManulalX + context.preset["deltaX0"] * context.deltaX0flag
-	fake_y = y * int(context.flagYaxis) + deltaY * int(context.flagDeltaY) + (autoY * 356000.0) + context.preset["deltaY0"] * context.deltaY0flag
+	fake_y = (
+		y * int(context.flagYaxis)
+		+ deltaY * int(context.flagDeltaY)
+		+ (autoY * 356000.0)
+		+ context.preset["deltaY0"] * context.deltaY0flag
+		- context.y_offset * int(context.flagYaxis)  # Apply the offset to normalize
+	)
 	fake_z = z + deltaZ + (autoZ * 356000.0)
+ 	
+  	# Update the previous state
+	context.previous_flagYaxis = context.flagYaxis	
+	if not context.flagYaxis and not context.previous_flagYaxis:
+		# Transition: Calculate the offset to normalize y
+		context.y_offset = y
+ 
+	diagnostics.watch(context.y_offset)
+	diagnostics.watch(y)
+	diagnostics.watch(fake_y)
+
 	
+ 
 	return fake_yaw, fake_pitch, fake_roll, fake_x, fake_y, fake_z
 
 def updateTrackir():
@@ -462,7 +505,7 @@ def updateTrackir():
 	z = 0 if isScrollLock else trackIR.z
 	
 	context.flagYaxis = abs(yaw) >= 45
-	context.flagDeltaY = not (context.autoCornerEnd < abs(yaw) and context.flagYaxis)
+	context.flagDeltaY = True #not (context.autoCornerEnd < abs(yaw) and context.flagYaxis)
 	
 	# ===================================================================  
 	# ================ END SWITCH PRESET LOGIC ==========================
@@ -697,9 +740,9 @@ def handle_toggles_and_flags(context):
 	# Handle global centering
 	if btn_globalCenter:
 		context.manual_yaw = 0
+		context.state_manager.update_y_axis_state(center=True, shift_1=False, shift_2=False)
 		keyboard.setPressed(GLOBAL_CENTER_KEY)
-		context.deltaX0flag = False
-		context.deltaY0flag = False
+		
 
 	# Handle GunView centering toggle
 	if toggleGunViewCentered:
