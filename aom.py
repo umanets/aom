@@ -5,6 +5,22 @@ import math
 import time
 import ctypes
 
+from System.Windows.Forms import Clipboard
+from System.Threading import Thread, ThreadStart, ApartmentState
+
+def set_clipboard_text(text):
+    def run():
+        try:
+            Clipboard.SetText(text)
+            diagnostics.debug("Clipboard text set successfully.")
+        except Exception as e:
+            diagnostics.debug("Error setting clipboard text: " + str(e))
+    thread_start = ThreadStart(run)
+    sta_thread = Thread(thread_start)
+    sta_thread.SetApartmentState(ApartmentState.STA)
+    sta_thread.Start()
+    sta_thread.Join() 
+
 # === USER CONFIGURABLE INPUTS ===
 THORTLE = 0
 STICK = 1
@@ -245,7 +261,21 @@ class AppState:
 			duration_close=4
 		)
 		self.checkSix = CheckSixManagement()
-	
+
+	def copy_preset_to_clipboard(self):
+		current_preset = self.preset
+		# Generate JSON-like string
+		preset_str = "{\n"
+		for k, v in sorted(current_preset.items()):
+			if isinstance(v, float):
+				preset_str += '    "{}": {:.4f},\n'.format(k, v)
+			else:
+				preset_str += '    "{}": {},\n'.format(k, float(v))
+		preset_str += "}"
+		
+		# Copy to clipboard
+		set_clipboard_text(preset_str)
+ 
 	def update_y_axis_state(self, center, shift_1, shift_2, shift_dynamic):
 		pass
 		# """Update Y-axis state flags in the context."""
@@ -418,6 +448,14 @@ class GunView(IAction):
 		isGunViewAtCenter = state.game.get("isGunViewAtCenter", False)
 		state.game["isGunViewAtCenter"] = not isGunViewAtCenter
 
+class CopyToClipboard(IAction):
+	def __init__(self):
+		pass
+
+	def handle(self, state):
+		speech.say("preset copied")
+		state.copy_preset_to_clipboard()
+
 class FlapsManagement:
 	def __init__(self, open_keys, close_keys, duration_open=3, duration_close=4):
 		"""
@@ -528,6 +566,9 @@ class EventStream:
 		for pad_key, preset_name in presets_map.items():
 			if keyboard.getKeyDown(Key.UpArrow) and keyboard.getPressed(pad_key):
 				yield ChangePresetAction(preset_name)
+    
+		if keyboard.getKeyDown(Key.UpArrow) and keyboard.getPressed(Key.NumberPadPeriod):
+				yield CopyToClipboard()
    
 		if isScrollLock() and state.tuneMode == None:
 			yield SwitchMode()
@@ -580,15 +621,12 @@ class EventStream:
 			yield ZoomIn()
 		if zoomCenter:
 			yield ZoomMiddle()
-		# if joystick[STICK].getPressed(8):
-		# 	yield Flaps()
 		if openFlaps:
 			yield FlapsOpen()
 		if closeFlaps:
 			yield FlapsClose()
 		if sixNotifier and btn_modifier:
 			yield ToggleCheckSixNotification()
-   
 		if isCustomView != state.game.get("isCustomView", False):
 			yield SwitchCustomView()
 	
