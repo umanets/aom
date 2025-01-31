@@ -5,6 +5,8 @@ import math
 import time
 import ctypes
 
+import clr
+clr.AddReference("System.Windows.Forms")
 from System.Windows.Forms import Clipboard
 from System.Threading import Thread, ThreadStart, ApartmentState
 
