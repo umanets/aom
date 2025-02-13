@@ -11,17 +11,17 @@ from System.Windows.Forms import Clipboard
 from System.Threading import Thread, ThreadStart, ApartmentState
 
 def set_clipboard_text(text):
-    def run():
-        try:
-            Clipboard.SetText(text)
-            diagnostics.debug("Clipboard text set successfully.")
-        except Exception as e:
-            diagnostics.debug("Error setting clipboard text: " + str(e))
-    thread_start = ThreadStart(run)
-    sta_thread = Thread(thread_start)
-    sta_thread.SetApartmentState(ApartmentState.STA)
-    sta_thread.Start()
-    sta_thread.Join() 
+	def run():
+		try:
+			Clipboard.SetText(text)
+			diagnostics.debug("Clipboard text set successfully.")
+		except Exception as e:
+			diagnostics.debug("Error setting clipboard text: " + str(e))
+	thread_start = ThreadStart(run)
+	sta_thread = Thread(thread_start)
+	sta_thread.SetApartmentState(ApartmentState.STA)
+	sta_thread.Start()
+	sta_thread.Join() 
 
 # === USER CONFIGURABLE INPUTS ===
 THORTLE = 0
@@ -45,13 +45,14 @@ sixNotifier = keyboard.getPressed(Key.F12)
 isCustomView = joystick[THORTLE].getDown(2)
 stick_y = joystick[STICK].y
 ingame_flaps_release = [Key.F]
-ingame_flaps_retract = [Key.LeftShift, Key.F]
+ingame_flaps_retract = [Key.F, Key.LeftShift]
 
 RESET_PRESET = "reset"
 LAGG_PRESET = "lagg"
 YAKONE_PRESET = "yakodin"
 F_FOUR_PRESET = "f4"
-YAKONE_B_PRESET ="yakodin and b"
+YAKONE_B_PRESET = "yakodin and b"
+LA_FIVE_PRESET = "la five"
 
 presets_map = {
 	Key.NumberPad0: RESET_PRESET,
@@ -59,6 +60,7 @@ presets_map = {
 	Key.NumberPad3: YAKONE_PRESET,
 	Key.NumberPad2: F_FOUR_PRESET,
 	Key.NumberPad4: YAKONE_B_PRESET,
+	Key.NumberPad4: LA_FIVE_PRESET,
 }
 
 # opentrack input params for "UDP over network"
@@ -113,42 +115,44 @@ class Presets:
 			"spitch": 0
 		},
 		LAGG_PRESET: {
-			"deltaX1": 1.4504,
-			"deltaY1": 0.63,
-			"deltaZ1": 6.73,
-			"deltaX0": 0.25,
-			"deltaY0": 0.1,
-			"deltaZ2_1": -4,
-			"deltaZ2_2": 7.49,
-			"deltaX2_1": 1.6,
-			"deltaY2_1": 1.2,
-			"deltaY2_2": 3.1,
-			"deltaX2_4": 0,
-			"deltaY2_4": -4.45,
-			"deltaZ2_4": 8.45,
-			"deltaYLow": -0.05,
-   			"deltaYHigh": 1.45,
-			"syaw": -2.5,
-			"spitch": -1
+			"deltaX0": 0.2500,
+			"deltaX1": 1.2804,
+			"deltaX2_1": 1.6000,
+			"deltaX2_4": 0.0,
+			"deltaY0": 0.1000,
+			"deltaY1": -0.1304,
+			"deltaY2_1": 1.1000,
+			"deltaY2_2": 1.6000,
+			"deltaY2_4": -4.4500,
+			"deltaYHigh": 1.4000,
+			"deltaYLow": -0.6500,
+			"deltaZ1": 6.5200,
+			"deltaZ2_1": -4.0,
+			"deltaZ2_2": 7.4900,
+			"deltaZ2_4": 8.4500,
+			"manual_yaw": -140.0,
+			"spitch": -1.0,
+			"syaw": -2.5000,
 		},
 		YAKONE_PRESET: {
-			"deltaX1": 1.2404,
-			"deltaY1": 2.79,
-			"deltaZ1": 6.67,
-			"deltaX0": 0.05,
-			"deltaY0": -0.06,
-			"deltaZ2_1": -4.20,
-			"deltaZ2_2": 8.69,
-			"deltaX2_1": 2.55,
-			"deltaY2_1": 0.95,
-			"deltaY2_2": 4.30,
-			"deltaX2_4": -0.45,
-			"deltaY2_4": -5.04,
-			"deltaZ2_4": 6.44,
-			"deltaYLow": -0.65,
-   			"deltaYHigh": 3.7,
-			"syaw": -1,
-			"spitch": -1.5
+			"deltaX0": 0.0400,
+			"deltaX1": 1.4504,
+			"deltaX2_1": 2.5500,
+			"deltaX2_4": -0.4500,
+			"deltaY0": -0.0100,
+			"deltaY1": 2.8100,
+			"deltaY2_1": 1.1000,
+			"deltaY2_2": 3.4500,
+			"deltaY2_4": -5.0400,
+			"deltaYHigh": 3.7000,
+			"deltaYLow": -1.0500,
+			"deltaZ1": 6.6000,
+			"deltaZ2_1": -4.2000,
+			"deltaZ2_2": 8.6900,
+			"deltaZ2_4": 6.4400,
+			"manual_yaw": -140.0000,
+			"spitch": -1.5000,
+			"syaw": -1.0000,
 		},
 		F_FOUR_PRESET: {
 			"deltaX1": 1.58,
@@ -188,6 +192,26 @@ class Presets:
 			"syaw": -2.5,
 			"spitch": -2
 		},
+		LA_FIVE_PRESET: {
+			"deltaX0": 0.0,
+			"deltaX1": 1.1904,
+			"deltaX2_1": 3.2500,
+			"deltaX2_4": -0.2500,
+			"deltaY0": 0.0,
+			"deltaY1": -2.7200,
+			"deltaY2_1": 1.2500,
+			"deltaY2_2": 1.4500,
+			"deltaY2_4": -3.9500,
+			"deltaYHigh": 1.2500,
+			"deltaYLow": -0.7500,
+			"deltaZ1": 6.7804,
+			"deltaZ2_1": -4.3000,
+			"deltaZ2_2": 6.3000,
+			"deltaZ2_4": 0.3500,
+			"manual_yaw": -134.5000,
+			"spitch": -1.0000,
+			"syaw": -2.0000,
+		}
 	}
 
 class TuneModes: 
@@ -346,7 +370,7 @@ class CenterGlobalView(IAction):
 		pass
 
 	def handle(self, state):
-		state.update_y_axis_state(center=True, shift_1=False, shift_2=False, shift_dynamic = False)
+		state.update_y_axis_state(center=False, shift_1=False, shift_2=False, shift_dynamic = False)
 		state.game["isZoomIn"] = False
 		state.game["isZoomOut"] = False
 		state.game["isSideView"] = False
@@ -405,13 +429,6 @@ class ZoomMiddle(IAction):
 		state.game["isZoomIn"] = False
 		state.game["isZoomOut"] = False
   
-class Flaps(IAction):
-	def __init__(self):
-		pass
-
-	def handle(self, state):
-		state.flaps_control.toggle_flap(current_time = time.time())
-
 class FlapsOpen(IAction):
 	def __init__(self):
 		pass
@@ -482,6 +499,7 @@ class FlapsManagement:
 			"flap_opened": False,
 		}
 		self.last_speech_time = time.time()
+		self.isFlapAction = False
 
 	def _toggle_flap_state(self, is_opening, current_time):
 		"""Toggle flap state between opening and closing."""
@@ -503,31 +521,36 @@ class FlapsManagement:
 		duration = self.duration_open if action == "is_flap_opening" else self.duration_close
 		keys = self.open_keys if action == "is_flap_opening" else self.close_keys
 		if self.flap_flags[start_time_key] is not None and (current_time - self.flap_flags[start_time_key]) < duration:
-			for key in keys:
-				keyboard.setKeyDown(key)
-		else:
-			for key in keys:
-				keyboard.setKeyUp(key)
-			self.flap_flags[action] = False
-			self.flap_flags[start_time_key] = None
+			if self.isFlapAction == False:
+				self.isFlapAction = True
+				for key in keys:
+					keyboard.setKeyDown(key)
+		elif self.flap_flags[start_time_key] is not None and (current_time - self.flap_flags[start_time_key]) > duration:
+			if self.isFlapAction == True:
+				self.isFlapAction = False
+				for key in keys:
+					keyboard.setKeyUp(key)
+				self.flap_flags[action] = False
+				self.flap_flags[start_time_key] = None
 
 	def isFlapOpend(self):
 		return self.flap_flags["flap_opened"]
-
-	def toggle_flap(self, current_time):
-		if self.flap_flags["is_flap_opening"] or self.flap_flags["is_flap_closing"]:
-			self._toggle_flap_state(not self.flap_flags["is_flap_opening"], current_time)
-		else:
-			self._toggle_flap_state(not self.flap_flags["flap_opened"], current_time)
-   
+ 
 	def open_flap(self, current_time):
+		self.isFlapAction = False
+		if self.flap_flags["is_flap_closing"]:
+			for key in self.close_keys:
+				keyboard.setKeyUp(key)
 		if self.flap_flags["is_flap_closing"] or not self.flap_flags["flap_opened"]:
 			self._toggle_flap_state(True, current_time)
-    
+	
 	def close_flap(self, current_time):
-		# force closing, as iot is sometimes unsync with game
-   		self._toggle_flap_state(False, current_time)
-   
+		self.isOpening = False
+		if self.flap_flags["is_flap_opening"]:
+			for key in self.open_keys:
+				keyboard.setKeyUp(key)
+		self._toggle_flap_state(False, current_time)
+	
 	def update(self, current_time):
 		self._handle_flap_action("is_flap_opening", current_time)
 		self._handle_flap_action("is_flap_closing", current_time)
@@ -568,7 +591,7 @@ class EventStream:
 		for pad_key, preset_name in presets_map.items():
 			if keyboard.getKeyDown(Key.UpArrow) and keyboard.getPressed(pad_key):
 				yield ChangePresetAction(preset_name)
-    
+	
 		if keyboard.getKeyDown(Key.UpArrow) and keyboard.getPressed(Key.NumberPadPeriod):
 				yield CopyToClipboard()
    
@@ -818,7 +841,7 @@ class TuningMode:
 		autoX, autoY, autoZ = self.calc._compute_auto_xyz(yaw) if mode == "isAuto" else (0, 0, 0)
 		
 		self.state.game["isSideView"] = mode == "isManualShiftX"
-		self.state.game["isGunViewAtCenter"] = mode == "isCenter"
+		self.state.game["isGunViewAtCenter"] = True
 		self.state.update_y_axis_state(
 	  		center=(mode == "isCenter"), 
 			shift_1=(mode == "isManualShiftY1"), 
@@ -830,8 +853,8 @@ class TuningMode:
 		deltaX = self.calc._compute_manual_x(yaw)
 		deltaY = self.calc._compute_manual_y(joy_y)
 		deltaZ = (
-			self.state.preset["deltaZ2_1"] * (mode == "isZoomIn" and mode != "isCenter") +
-			self.state.preset["deltaZ2_2"] * (mode == "isZoomOut" or mode == "isCenter")
+			self.state.preset["deltaZ2_1"] * (mode == "isZoomIn") +
+			self.state.preset["deltaZ2_2"] * (mode == "isZoomOut" or mode == "isCenter" or mode == "isManualShiftY1" or mode == "isManualShiftY2")
 		)
 
 		if mode == "isCustomView":
