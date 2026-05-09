@@ -684,6 +684,12 @@ class Diagnostics:
 	
 		diagnostics.watch(state.preset["syaw"])
 		diagnostics.watch(state.preset["spitch"])
+		diagnostics.watch(trackIR.yaw)
+		diagnostics.watch(trackIR.pitch)
+		diagnostics.watch(trackIR.roll)
+		diagnostics.watch(trackIR.x)
+		diagnostics.watch(trackIR.y)
+		diagnostics.watch(trackIR.z)
 
 class Six_DOF_Calc_Helpers:
 	def __init__(self, state):

@@ -57,6 +57,44 @@ Original source: [YouTube Link](https://youtu.be/uFRTDDxlJS0?si=ArSjSo7CxEFlsbCZ
    - Load the `aom.py` script in FreePIE.
    - **Important:** Run FreePIE as administrator to ensure compatibility with TrackIR.
 
+### Native D3D11 Overlay Scaffold
+
+The repository now includes a native `D3D11` overlay scaffold under `src/Aom.Overlay.D3D11` for future IL-2 in-process rendering.
+
+- It reads the overlay feed published by `Aom.App` via shared memory.
+- It exposes exported entry points that a future `Present` hook/injector can call inside the game process.
+- Build it with `build-overlay-native.bat`.
+
+The main `.NET` solution build stays `dotnet build Aom.Desktop.slnx`; the native overlay is built separately via Visual Studio Build Tools because `dotnet build` does not import `Microsoft.Cpp.*` targets for `vcxproj` files.
+
+### Overlay POC Path
+
+There is also a standalone `D3D11` host app under `src/Aom.Overlay.D3D11.Host`.
+
+- Start `Aom.App` and turn the overlay on so the shared-memory feed is live.
+- Run `run-overlay-poc.bat`.
+- The POC host creates its own `DXGI` swap chain and calls the same overlay DLL entry points that a future game hook will use.
+- If the AOM HUD appears inside the POC window, the shared-memory feed and the native `D3D11` renderer are already working; the remaining step is the actual IL-2 process injection / `Present` hook.
+
+### Injected Hook POC Path
+
+There is also an injected hook POC that validates the next step after the standalone host.
+
+- Start `Aom.App` and turn the overlay on.
+- Run `run-overlay-hook-poc.bat`.
+- The script starts the host in a wait state, injects `AomOverlayD3D11.dll`, releases the host to create its `D3D11` device, and waits for the first hooked `Present` event.
+- If the script reports `PresentHookObserved = True`, the in-process `D3D11CreateDeviceAndSwapChain` import hook and `IDXGISwapChain::Present` vtable hook are both alive.
+
+### IL-2 Test Path
+
+You can now try the same hook against a real IL-2 process.
+
+- Start `Aom.App` and turn the overlay on.
+- Run `run-il2-overlay-test.bat` to start `Il-2.exe` directly and inject the overlay DLL.
+- If you need the game launcher first, run `run-il2-overlay-test.bat -UseLauncher`.
+- Add `-DryRun` to verify paths and the generated hook event name without launching the game.
+- If the script reports `PresentHookObserved = True`, the real IL-2 process reached the first hooked `Present` call.
+
 ### Configuration
 
 1. Open the `aom.py` file in a text editor.

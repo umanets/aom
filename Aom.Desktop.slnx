@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Aom.App/Aom.App.csproj" />
+    <Project Path="src/Aom.App.Tests/Aom.App.Tests.csproj" />
+    <Project Path="src/Aom.Core.Tests/Aom.Core.Tests.csproj" />
+    <Project Path="src/Aom.Core/Aom.Core.csproj" />
+  </Folder>
+</Solution>

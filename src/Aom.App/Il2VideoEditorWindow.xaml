@@ -1,0 +1,384 @@
+<Window x:Class="Aom.App.Il2VideoEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="IL-2 Video Editor"
+        Width="1180"
+        Height="760"
+        MinWidth="920"
+        MinHeight="620"
+        Background="#08111E"
+        PreviewKeyDown="OnWindowPreviewKeyDown"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="3*" />
+            <RowDefinition Height="2*" />
+        </Grid.RowDefinitions>
+
+        <Border Padding="18"
+                Background="#122033"
+                CornerRadius="16">
+            <StackPanel>
+                <TextBlock x:Name="TitleTextBlock"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           Foreground="#F3F7FA"
+                           Text="IL-2 Video Editor" />
+                <TextBlock x:Name="MetaTextBlock"
+                           Margin="0,8,0,0"
+                           Foreground="#9FB0C3"
+                           TextWrapping="Wrap" />
+                <TextBlock x:Name="SourcePathTextBlock"
+                           Margin="0,6,0,0"
+                           Foreground="#4FD1C5"
+                           TextWrapping="Wrap" />
+                <TextBlock x:Name="ProjectPathTextBlock"
+                           Margin="0,6,0,0"
+                           Foreground="#9FB0C3"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Margin="0,14,0,0"
+                Padding="14"
+                Background="#0D1828"
+                BorderBrush="#213A54"
+                BorderThickness="1"
+                CornerRadius="16">
+            <Grid>
+                <MediaElement x:Name="PlayerElement"
+                              LoadedBehavior="Manual"
+                              UnloadedBehavior="Manual"
+                              ScrubbingEnabled="True"
+                              Stretch="Uniform"
+                              MediaOpened="OnMediaOpened"
+                              MediaEnded="OnMediaEnded"
+                              MediaFailed="OnMediaFailed" />
+
+                        <Canvas x:Name="AnnotationCanvas"
+                            Background="Transparent"
+                            SizeChanged="OnAnnotationCanvasSizeChanged"
+                            MouseLeftButtonDown="OnAnnotationCanvasMouseLeftButtonDown"
+                            MouseMove="OnAnnotationCanvasMouseMove"
+                            MouseLeftButtonUp="OnAnnotationCanvasMouseLeftButtonUp" />
+
+                        <Canvas x:Name="AnnotationEditorLayer" />
+
+                <Border x:Name="ViewportStatusBorder"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="14,10"
+                        Background="#CC08111E"
+                        CornerRadius="12">
+                    <TextBlock x:Name="ViewportStatusTextBlock"
+                               Foreground="#F3F7FA"
+                               FontSize="16"
+                               Text="Loading video..." />
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
+                Margin="0,14,0,0"
+                Padding="18"
+                Background="#122033"
+                CornerRadius="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <DockPanel LastChildFill="False">
+                    <StackPanel Orientation="Horizontal">
+                    <Button x:Name="PlayPauseButton"
+                        Padding="14,8"
+                        Click="OnPlayPauseClicked"
+                        Content="Play" />
+                        <Button Margin="8,0,0,0"
+                                Padding="14,8"
+                                Click="OnStopClicked"
+                                Content="Stop" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal"
+                                DockPanel.Dock="Right">
+                        <Button x:Name="ExportButton"
+                            Margin="0,0,12,0"
+                            Padding="14,8"
+                            Click="OnExportClicked"
+                            Content="Export MP4" />
+                        <TextBlock Margin="0,0,8,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="#9FB0C3"
+                                   Text="Preview speed" />
+                        <ComboBox x:Name="SpeedComboBox"
+                                  Width="96"
+                                  SelectionChanged="OnSpeedSelectionChanged">
+                            <ComboBoxItem Content="0.50x" Tag="0.5" />
+                            <ComboBoxItem Content="0.75x" Tag="0.75" />
+                            <ComboBoxItem Content="1.00x" Tag="1.0" />
+                            <ComboBoxItem Content="1.25x" Tag="1.25" />
+                            <ComboBoxItem Content="1.50x" Tag="1.5" />
+                            <ComboBoxItem Content="2.00x" Tag="2.0" />
+                        </ComboBox>
+                    </StackPanel>
+                </DockPanel>
+
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="CurrentPositionTextBlock"
+                               VerticalAlignment="Center"
+                               Foreground="#F3F7FA"
+                               Text="00:00" />
+
+                    <Slider x:Name="SeekSlider"
+                            Grid.Column="1"
+                            Margin="12,0"
+                            Minimum="0"
+                            Maximum="1"
+                            ValueChanged="OnSeekSliderValueChanged"
+                            PreviewMouseLeftButtonDown="OnSeekSliderMouseDown"
+                            PreviewMouseLeftButtonUp="OnSeekSliderMouseUp" />
+
+                    <TextBlock x:Name="DurationTextBlock"
+                               Grid.Column="2"
+                               VerticalAlignment="Center"
+                               Foreground="#F3F7FA"
+                               Text="00:00" />
+                </Grid>
+
+                <TextBlock Margin="0,10,0,0"
+                           Foreground="#9FB0C3"
+                           Text="Preview now honors saved freeze and slow markers. Export renders an edited MP4 through FFmpeg from the saved project model." 
+                           TextWrapping="Wrap" />
+
+                <TextBlock x:Name="StatusTextBlock"
+                           Margin="0,8,0,0"
+                           Foreground="#4FD1C5"
+                           Text="Preparing playback..."
+                           TextWrapping="Wrap" />
+
+                <StackPanel x:Name="ExportProgressPanel"
+                            Margin="0,10,0,0"
+                            Visibility="Collapsed">
+                    <DockPanel LastChildFill="False">
+                        <TextBlock x:Name="ExportProgressTextBlock"
+                                   Foreground="#F3F7FA"
+                                   Text="Preparing export..." />
+                        <TextBlock x:Name="ExportProgressPercentTextBlock"
+                                   DockPanel.Dock="Right"
+                                   Foreground="#9FB0C3"
+                                   Text="0%" />
+                    </DockPanel>
+                    <ProgressBar x:Name="ExportProgressBar"
+                                 Height="12"
+                                 Margin="0,6,0,0"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="0" />
+                </StackPanel>
+
+                <Grid Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Padding="14"
+                            Background="#0D1828"
+                            BorderBrush="#213A54"
+                            BorderThickness="1"
+                            CornerRadius="12">
+                        <StackPanel>
+                            <TextBlock FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="#F3F7FA"
+                                       Text="Freeze Frames" />
+                            <TextBlock Margin="0,6,0,0"
+                                       Foreground="#9FB0C3"
+                                       Text="Pause on a frame, choose how long to hold it, and store a freeze marker in the project."
+                                       TextWrapping="Wrap" />
+
+                            <DockPanel Margin="0,12,0,0"
+                                       LastChildFill="False">
+                                <Button Padding="12,6"
+                                        Click="OnAddFreezeClicked"
+                                        Content="Add Freeze At Current Frame" />
+
+                                <Button Margin="10,0,0,0"
+                                    Padding="12,6"
+                                    Click="OnDeleteFreezeClicked"
+                                    Content="Delete Selected Freeze" />
+
+                                <StackPanel Orientation="Horizontal"
+                                            DockPanel.Dock="Right">
+                                    <TextBlock Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="#9FB0C3"
+                                               Text="Hold" />
+                                    <ComboBox x:Name="FreezeDurationComboBox"
+                                              Width="110">
+                                        <ComboBoxItem Content="1 second" Tag="1" />
+                                        <ComboBoxItem Content="2 seconds" Tag="2" />
+                                        <ComboBoxItem Content="3 seconds" Tag="3" />
+                                        <ComboBoxItem Content="5 seconds" Tag="5" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </DockPanel>
+
+                            <ListBox x:Name="FreezeAnnotationsListBox"
+                                     Height="132"
+                                     Margin="0,12,0,0"
+                                     SelectionChanged="OnFreezeAnnotationsSelectionChanged" />
+
+                            <TextBlock x:Name="SelectedFreezeTextBlock"
+                                       Margin="0,12,0,0"
+                                       Foreground="#9FB0C3"
+                                       Text="Select a freeze marker to annotate it on the paused frame." 
+                                       TextWrapping="Wrap" />
+
+                            <WrapPanel Margin="0,10,0,0">
+                                <RadioButton x:Name="LineToolRadioButton"
+                                             GroupName="AnnotationTools"
+                                             Margin="0,0,12,0"
+                                             Checked="OnAnnotationToolChecked"
+                                             Content="Line" />
+                                <RadioButton x:Name="RectangleToolRadioButton"
+                                             GroupName="AnnotationTools"
+                                             Margin="0,0,12,0"
+                                             Checked="OnAnnotationToolChecked"
+                                             Content="Rectangle" />
+                                <RadioButton x:Name="EllipseToolRadioButton"
+                                             GroupName="AnnotationTools"
+                                             Margin="0,0,12,0"
+                                             Checked="OnAnnotationToolChecked"
+                                             Content="Circle" />
+                                <RadioButton x:Name="TextToolRadioButton"
+                                             GroupName="AnnotationTools"
+                                             Margin="0,0,12,0"
+                                             Checked="OnAnnotationToolChecked"
+                                             Content="Text" />
+                                <TextBox x:Name="AnnotationTextTextBox"
+                                         Width="220"
+                                         MinHeight="64"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Text="Pilot note" />
+                            </WrapPanel>
+
+                                <TextBlock Margin="0,12,0,0"
+                                       Foreground="#9FB0C3"
+                                       Text="Saved primitives on this freeze frame. Select one to replace it by redrawing, or delete it." 
+                                       TextWrapping="Wrap" />
+
+                                <DockPanel Margin="0,10,0,0"
+                                       LastChildFill="False">
+                                <Button Padding="12,6"
+                                    Click="OnEditSelectedPrimitiveClicked"
+                                    Content="Edit Selected Primitive" />
+                                <Button Margin="10,0,0,0"
+                                    Padding="12,6"
+                                    Click="OnDeleteSelectedPrimitiveClicked"
+                                    Content="Delete Selected Primitive" />
+                                </DockPanel>
+
+                                <ListBox x:Name="FreezePrimitiveListBox"
+                                     Height="120"
+                                     Margin="0,12,0,0"
+                                     DisplayMemberPath="DisplayText"
+                                     SelectionChanged="OnFreezePrimitiveSelectionChanged" />
+
+                                <TextBlock x:Name="SelectedPrimitiveTextBlock"
+                                       Margin="0,10,0,0"
+                                       Foreground="#9FB0C3"
+                                       Text="Select a primitive to edit or delete it." 
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            Padding="14"
+                            Background="#0D1828"
+                            BorderBrush="#213A54"
+                            BorderThickness="1"
+                            CornerRadius="12">
+                        <StackPanel>
+                            <TextBlock FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="#F3F7FA"
+                                       Text="Slow Ranges" />
+                            <TextBlock Margin="0,6,0,0"
+                                       Foreground="#9FB0C3"
+                                       Text="Mark a start and end position, then save a non-overlapping slow-motion range in the project."
+                                       TextWrapping="Wrap" />
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button Padding="12,6"
+                                        Click="OnMarkSlowStartClicked"
+                                        Content="Mark Start" />
+                                <TextBlock x:Name="SlowRangeStartTextBlock"
+                                           Grid.Column="1"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="#F3F7FA"
+                                           Text="Not set" />
+
+                                <Button Grid.Column="2"
+                                        Margin="16,0,0,0"
+                                        Padding="12,6"
+                                        Click="OnMarkSlowEndClicked"
+                                        Content="Mark End" />
+                                <TextBlock x:Name="SlowRangeEndTextBlock"
+                                           Grid.Column="3"
+                                           Margin="10,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="#F3F7FA"
+                                           Text="Not set" />
+                            </Grid>
+
+                            <DockPanel Margin="0,12,0,0"
+                                       LastChildFill="False">
+                                <Button Padding="12,6"
+                                        Click="OnAddSlowRangeClicked"
+                                        Content="Add Slow Range" />
+
+                                <StackPanel Orientation="Horizontal"
+                                            DockPanel.Dock="Right">
+                                    <TextBlock Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="#9FB0C3"
+                                               Text="Speed" />
+                                    <ComboBox x:Name="SlowSpeedComboBox"
+                                              Width="96">
+                                        <ComboBoxItem Content="0.25x" Tag="0.25" />
+                                        <ComboBoxItem Content="0.50x" Tag="0.5" />
+                                        <ComboBoxItem Content="0.75x" Tag="0.75" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </DockPanel>
+
+                            <ListBox x:Name="SlowRangesListBox"
+                                     Height="132"
+                                     Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>
