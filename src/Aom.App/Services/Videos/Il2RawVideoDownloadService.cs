@@ -6,7 +6,7 @@ using YoutubeExplode.Videos;
 
 namespace Aom.App.Services.Videos;
 
-public sealed class Il2RawVideoDownloadService : IDisposable
+public sealed class Il2RawVideoDownloadService : IIl2RawVideoDownloadService
 {
     private readonly HttpClient httpClient;
     private readonly YoutubeClient youtubeClient;

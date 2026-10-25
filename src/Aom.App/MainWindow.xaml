@@ -796,7 +796,7 @@
                                        Text="IL-2 Videos Raw" />
                             <TextBlock Margin="0,6,0,0"
                                        Foreground="{StaticResource TextMutedBrush}"
-                                       Text="Paste a YouTube URL, download the raw mp4, then click any thumbnail card to open the file in your default video player."
+                                       Text="Paste YouTube URLs, queue raw mp4 downloads, then click any thumbnail card to open the file in your default video player."
                                        TextWrapping="Wrap" />
 
                             <Grid Margin="0,18,0,0">
@@ -805,13 +805,18 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBox Padding="10,8"
-                                         VerticalAlignment="Center"
+                                <TextBox MinHeight="72"
+                                         Padding="10,8"
+                                         VerticalAlignment="Stretch"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
                                          Text="{Binding PendingUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                                 <Button Grid.Column="1"
                                         Margin="12,0,0,0"
                                         Padding="16,8"
+                                        VerticalAlignment="Top"
                                         Command="{Binding DownloadCommand}"
                                         Content="{Binding DownloadButtonLabel}" />
                             </Grid>
@@ -879,6 +884,10 @@
                                            Foreground="{StaticResource TextMutedBrush}"
                                            TextWrapping="Wrap"
                                            Text="{Binding Status}" />
+                                <TextBlock Margin="0,8,0,0"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding DownloadQueueSummary}" />
                             </StackPanel>
                         </Border>
                     </Grid>

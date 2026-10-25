@@ -5,4 +5,9 @@
     <Project Path="src/Aom.Core.Tests/Aom.Core.Tests.csproj" />
     <Project Path="src/Aom.Core/Aom.Core.csproj" />
   </Folder>
+  <Folder Name="/third_parties/" />
+  <Folder Name="/third_parties/YoutubeExplode/">
+    <Project Path="third_parties/YoutubeExplode/YoutubeExplode.Converter/YoutubeExplode.Converter.csproj" />
+    <Project Path="third_parties/YoutubeExplode/YoutubeExplode/YoutubeExplode.csproj" />
+  </Folder>
 </Solution>

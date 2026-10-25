@@ -10,23 +10,26 @@ namespace Aom.App.ViewModels;
 public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private PersistedIl2RawVideoCatalog catalog;
-    private Il2RawVideoDownloadService downloadService;
+    private IIl2RawVideoDownloadService downloadService;
     private readonly LocalFileLauncher localFileLauncher;
     private readonly RelayCommand<object> downloadCommand;
     private readonly RelayCommand<object> chooseLibraryFolderCommand;
     private readonly Func<string, string?> chooseLibraryFolder;
     private bool ownsDownloadService;
     private List<Il2RawVideoListItemViewModel> videos = new();
+    private readonly Queue<Il2RawVideoDownloadQueueItem> downloadQueue = new();
     private string pendingUrl = string.Empty;
-    private string status = "Paste a YouTube URL to download the first raw video.";
+    private string status = "Paste one or more YouTube URLs to queue raw video downloads.";
     private bool isDownloadInProgress;
     private CancellationTokenSource? downloadCancellation;
     private Task<Il2RawVideoRecord>? downloadTask;
+    private Task? downloadQueueTask;
+    private string? activeDownloadVideoId;
 
     public Il2RawVideoLibraryViewModel(
         string? libraryRootPath = null,
         PersistedIl2RawVideoCatalog? catalog = null,
-        Il2RawVideoDownloadService? downloadService = null,
+        IIl2RawVideoDownloadService? downloadService = null,
         LocalFileLauncher? localFileLauncher = null,
         Func<string, string?>? chooseLibraryFolder = null)
     {
@@ -35,7 +38,7 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
         this.localFileLauncher = localFileLauncher ?? new LocalFileLauncher();
         this.chooseLibraryFolder = chooseLibraryFolder ?? PickLibraryFolder;
         ownsDownloadService = downloadService is null;
-        downloadCommand = new RelayCommand<object>(_ => _ = StartDownloadAsync(), _ => CanDownload());
+        downloadCommand = new RelayCommand<object>(_ => QueuePendingUrls(), _ => CanDownload());
         chooseLibraryFolderCommand = new RelayCommand<object>(_ => ChooseLibraryFolder(), _ => CanChooseLibraryFolder());
 
         ReloadLibraryItems();
@@ -90,12 +93,23 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
             isDownloadInProgress = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(DownloadButtonLabel));
+            OnPropertyChanged(nameof(DownloadQueueSummary));
             downloadCommand.RaiseCanExecuteChanged();
             chooseLibraryFolderCommand.RaiseCanExecuteChanged();
         }
     }
 
-    public string DownloadButtonLabel => IsDownloadInProgress ? "Downloading..." : "Download";
+    public string DownloadButtonLabel => IsDownloadInProgress ? "Add to Queue" : "Queue Download";
+
+    public int QueuedDownloadCount => downloadQueue.Count;
+
+    public string DownloadQueueSummary => IsDownloadInProgress
+        ? downloadQueue.Count == 0
+            ? "No queued downloads after the current video."
+            : $"{downloadQueue.Count} queued after the current video."
+        : downloadQueue.Count == 0
+            ? "No queued downloads."
+            : $"{downloadQueue.Count} queued download(s).";
 
     public string LibraryPath => catalog.LibraryRootPath;
 
@@ -111,6 +125,8 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
 
     public ICommand ChooseLibraryFolderCommand => chooseLibraryFolderCommand;
 
+    internal Task? DownloadQueueTask => downloadQueueTask;
+
     public async ValueTask DisposeAsync()
     {
         if (downloadCancellation is not null)
@@ -118,11 +134,11 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
             downloadCancellation.Cancel();
         }
 
-        if (downloadTask is not null)
+        if (downloadQueueTask is not null)
         {
             try
             {
-                await downloadTask;
+                await downloadQueueTask;
             }
             catch (OperationCanceledException)
             {
@@ -141,13 +157,13 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
         }
     }
 
-    private bool CanDownload() => !IsDownloadInProgress && !string.IsNullOrWhiteSpace(PendingUrl);
+    private bool CanDownload() => !string.IsNullOrWhiteSpace(PendingUrl);
 
-    private bool CanChooseLibraryFolder() => !IsDownloadInProgress;
+    private bool CanChooseLibraryFolder() => !IsDownloadInProgress && downloadQueue.Count == 0;
 
     public bool ChangeLibraryPath(string? libraryRootPath)
     {
-        if (IsDownloadInProgress || string.IsNullOrWhiteSpace(libraryRootPath))
+        if (IsDownloadInProgress || downloadQueue.Count > 0 || string.IsNullOrWhiteSpace(libraryRootPath))
         {
             return false;
         }
@@ -190,74 +206,153 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
         ChangeLibraryPath(selectedPath);
     }
 
-    private async Task StartDownloadAsync()
+    private void QueuePendingUrls()
+    {
+        var pendingUrls = SplitPendingUrls(PendingUrl);
+        if (pendingUrls.Count == 0)
+        {
+            Status = "Paste a YouTube URL first.";
+            return;
+        }
+
+        var invalidUrls = new List<string>();
+        var queuedCount = 0;
+        var skippedExistingCount = 0;
+        var skippedDuplicateCount = 0;
+
+        foreach (var pendingUrl in pendingUrls)
+        {
+            string normalizedVideoId;
+            try
+            {
+                normalizedVideoId = Il2RawVideoDownloadService.NormalizeVideoId(pendingUrl);
+            }
+            catch (ArgumentException)
+            {
+                invalidUrls.Add(pendingUrl);
+                continue;
+            }
+
+            if (TryFindAvailableVideo(normalizedVideoId, out _))
+            {
+                skippedExistingCount++;
+                continue;
+            }
+
+            if (IsDownloadQueuedOrActive(normalizedVideoId))
+            {
+                skippedDuplicateCount++;
+                continue;
+            }
+
+            downloadQueue.Enqueue(new Il2RawVideoDownloadQueueItem(pendingUrl, normalizedVideoId));
+            queuedCount++;
+        }
+
+        PendingUrl = invalidUrls.Count == 0
+            ? string.Empty
+            : string.Join(Environment.NewLine, invalidUrls);
+        NotifyDownloadQueueChanged();
+        Status = BuildQueueResultStatus(queuedCount, skippedExistingCount, skippedDuplicateCount, invalidUrls.Count);
+        EnsureDownloadQueueProcessing();
+    }
+
+    private async Task ProcessDownloadQueueAsync()
     {
         if (IsDownloadInProgress)
         {
             return;
         }
 
-        var urlSnapshot = PendingUrl.Trim();
-        if (string.IsNullOrWhiteSpace(urlSnapshot))
-        {
-            Status = "Paste a YouTube URL first.";
-            return;
-        }
-
-        string normalizedVideoId;
-        try
-        {
-            normalizedVideoId = Il2RawVideoDownloadService.NormalizeVideoId(urlSnapshot);
-        }
-        catch (ArgumentException exception)
-        {
-            Status = exception.Message;
-            return;
-        }
-
-        var existingItem = videos.FirstOrDefault(item => string.Equals(item.VideoId, normalizedVideoId, StringComparison.Ordinal));
-        if (existingItem is not null && File.Exists(existingItem.LocalVideoPath))
-        {
-            Status = $"'{existingItem.Title}' is already in the library.";
-            return;
-        }
-
         IsDownloadInProgress = true;
-        Status = "Preparing download...";
         downloadCancellation = new CancellationTokenSource();
+        var completedCount = 0;
+        var failedCount = 0;
+        var skippedCount = 0;
+        string? lastDownloadedTitle = null;
+        string? lastFailureMessage = null;
+        var wasCanceled = false;
 
         try
         {
-            var progress = new Progress<double>(value =>
+            while (downloadQueue.Count > 0)
             {
-                var percent = (int)Math.Round(Math.Clamp(value, 0.0, 1.0) * 100.0);
-                Status = percent >= 100
-                    ? "Finalizing download..."
-                    : $"Downloading... {percent}%";
-            });
+                var queuedDownload = downloadQueue.Dequeue();
+                activeDownloadVideoId = queuedDownload.VideoId;
+                NotifyDownloadQueueChanged();
 
-            downloadTask = downloadService.DownloadAsync(urlSnapshot, progress, downloadCancellation.Token);
-            var record = await downloadTask;
+                if (TryFindAvailableVideo(queuedDownload.VideoId, out var existingItem))
+                {
+                    skippedCount++;
+                    Status = $"'{existingItem!.Title}' is already in the library.";
+                    activeDownloadVideoId = null;
+                    NotifyDownloadQueueChanged();
+                    continue;
+                }
 
-            Upsert(record);
-            catalog.Save(videos.Select(item => item.Entry));
-            PendingUrl = string.Empty;
-            Status = $"Downloaded '{record.Title}'.";
+                Status = BuildActiveDownloadStatus("Preparing download...");
+
+                var progress = new Progress<double>(value =>
+                {
+                    var percent = (int)Math.Round(Math.Clamp(value, 0.0, 1.0) * 100.0);
+                    Status = percent >= 100
+                        ? BuildActiveDownloadStatus("Finalizing download...")
+                        : BuildActiveDownloadStatus($"Downloading... {percent}%");
+                });
+
+                try
+                {
+                    downloadTask = downloadService.DownloadAsync(queuedDownload.SourceUrl, progress, downloadCancellation.Token);
+                    var record = await downloadTask;
+
+                    Upsert(record);
+                    catalog.Save(videos.Select(item => item.Entry));
+                    completedCount++;
+                    lastDownloadedTitle = record.Title;
+                    Status = downloadQueue.Count == 0
+                        ? $"Downloaded '{record.Title}'."
+                        : $"Downloaded '{record.Title}'. {downloadQueue.Count} queued download(s) remaining.";
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    failedCount++;
+                    lastFailureMessage = $"Download failed: {exception.Message}";
+                    Status = downloadQueue.Count == 0
+                        ? lastFailureMessage
+                        : $"{lastFailureMessage} {downloadQueue.Count} queued download(s) remaining.";
+                }
+                finally
+                {
+                    downloadTask = null;
+                    activeDownloadVideoId = null;
+                }
+            }
+
+            Status = BuildFinishedQueueStatus(completedCount, failedCount, skippedCount, lastDownloadedTitle, lastFailureMessage);
         }
         catch (OperationCanceledException)
         {
+            wasCanceled = true;
             Status = "Video download canceled.";
-        }
-        catch (Exception exception)
-        {
-            Status = exception.Message;
+            downloadQueue.Clear();
+            NotifyDownloadQueueChanged();
         }
         finally
         {
             downloadTask = null;
+            activeDownloadVideoId = null;
             downloadCancellation?.Dispose();
             downloadCancellation = null;
             IsDownloadInProgress = false;
+
+            if (!wasCanceled && downloadQueue.Count > 0)
+            {
+                EnsureDownloadQueueProcessing();
+            }
         }
     }
 
@@ -292,6 +387,139 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
 
     private Il2RawVideoListItemViewModel CreateVideoItem(Il2RawVideoRecord record) =>
         new(record, OpenVideo, EditVideo);
+
+    private static IReadOnlyList<string> SplitPendingUrls(string pendingUrls) =>
+        pendingUrls
+            .Split(new[] { '\r', '\n', '\t', ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToArray();
+
+    private void EnsureDownloadQueueProcessing()
+    {
+        if (IsDownloadInProgress || downloadQueue.Count == 0)
+        {
+            return;
+        }
+
+        downloadQueueTask = ProcessDownloadQueueAsync();
+    }
+
+    private bool TryFindAvailableVideo(string videoId, out Il2RawVideoListItemViewModel? existingItem)
+    {
+        existingItem = videos.FirstOrDefault(item => string.Equals(item.VideoId, videoId, StringComparison.Ordinal));
+        return existingItem is not null && File.Exists(existingItem.LocalVideoPath);
+    }
+
+    private bool IsDownloadQueuedOrActive(string videoId) =>
+        string.Equals(activeDownloadVideoId, videoId, StringComparison.Ordinal)
+        || downloadQueue.Any(item => string.Equals(item.VideoId, videoId, StringComparison.Ordinal));
+
+    private void NotifyDownloadQueueChanged()
+    {
+        OnPropertyChanged(nameof(QueuedDownloadCount));
+        OnPropertyChanged(nameof(DownloadQueueSummary));
+        chooseLibraryFolderCommand.RaiseCanExecuteChanged();
+    }
+
+    private string BuildActiveDownloadStatus(string prefix) => downloadQueue.Count == 0
+        ? prefix
+        : $"{prefix} {downloadQueue.Count} queued download(s) remaining.";
+
+    private static string BuildQueueResultStatus(
+        int queuedCount,
+        int skippedExistingCount,
+        int skippedDuplicateCount,
+        int invalidCount)
+    {
+        var parts = new List<string>();
+
+        if (queuedCount == 0)
+        {
+            if (invalidCount > 0)
+            {
+                return $"No valid YouTube URLs found. {invalidCount} invalid URL(s).";
+            }
+
+            if (skippedExistingCount > 0 && skippedDuplicateCount == 0)
+            {
+                return "Those videos are already in the library.";
+            }
+
+            if (skippedDuplicateCount > 0 && skippedExistingCount == 0)
+            {
+                return "Those videos are already queued.";
+            }
+
+            return "No new videos were queued.";
+        }
+
+        if (queuedCount > 0)
+        {
+            parts.Add($"Queued {queuedCount} video(s)");
+        }
+
+        if (skippedExistingCount > 0)
+        {
+            parts.Add($"skipped {skippedExistingCount} already downloaded");
+        }
+
+        if (skippedDuplicateCount > 0)
+        {
+            parts.Add($"skipped {skippedDuplicateCount} already queued");
+        }
+
+        if (invalidCount > 0)
+        {
+            parts.Add($"left {invalidCount} invalid URL(s) in the input");
+        }
+
+        return parts.Count == 0
+            ? "No new videos were queued."
+            : string.Join("; ", parts) + ".";
+    }
+
+    private static string BuildFinishedQueueStatus(
+        int completedCount,
+        int failedCount,
+        int skippedCount,
+        string? lastDownloadedTitle,
+        string? lastFailureMessage)
+    {
+        if (completedCount == 0 && failedCount == 0 && skippedCount == 0)
+        {
+            return "No new videos were downloaded.";
+        }
+
+        if (completedCount == 1 && failedCount == 0 && skippedCount == 0 && !string.IsNullOrWhiteSpace(lastDownloadedTitle))
+        {
+            return $"Downloaded '{lastDownloadedTitle}'.";
+        }
+
+        if (completedCount == 0 && failedCount == 1 && skippedCount == 0 && !string.IsNullOrWhiteSpace(lastFailureMessage))
+        {
+            return lastFailureMessage;
+        }
+
+        var parts = new List<string>();
+        if (completedCount > 0)
+        {
+            parts.Add($"{completedCount} downloaded");
+        }
+
+        if (failedCount > 0)
+        {
+            parts.Add($"{failedCount} failed");
+        }
+
+        if (skippedCount > 0)
+        {
+            parts.Add($"{skippedCount} skipped");
+        }
+
+        var message = $"Finished queue: {string.Join(", ", parts)}.";
+        return failedCount > 0 && !string.IsNullOrWhiteSpace(lastFailureMessage)
+            ? $"{message} Last error: {lastFailureMessage}"
+            : message;
+    }
 
     private static string? PickLibraryFolder(string currentLibraryPath)
     {
@@ -370,4 +598,6 @@ public sealed class Il2RawVideoLibraryViewModel : INotifyPropertyChanged, IAsync
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    private sealed record Il2RawVideoDownloadQueueItem(string SourceUrl, string VideoId);
 }
